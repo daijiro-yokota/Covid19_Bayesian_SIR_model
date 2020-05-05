@@ -1,0 +1,134 @@
+---
+title: "COVID-19 Final Capstone"
+author: "Ciara Moore, Daijiro Yokota, Christina Cai"
+date: "4/20/2020"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r, warning=FALSE, message=FALSE}
+## tsiR examples
+
+## load the package and dependencies
+## kernlab is for the gaussian process 
+## the rest are for plotting 
+require(tsiR)
+require(kernlab)
+require(reshape2)
+require(grid)
+require(dplyr)
+require(xts)
+library(lubridate)
+library(shiny)
+library(ggExtra)
+library(rstan)
+library(ggplot2)
+library(janitor)
+```
+
+
+```{r}
+load("covid.Rda")
+
+covid <- data
+
+covid$pop <- covid$population
+covid$time <- covid$date
+covid$cases <- covid$confirmed
+covid$births <- covid$BirthRate * covid$population/1000      ## change this to the population/1000 for each country
+```
+
+
+## Inside Shiny - We want to do this in Shiny App
+
+```{r}
+df_country <- covid %>% filter(country == "US") %>% select(pop, time, births, cases)
+
+set.seed(458)
+
+df_weekly <- df_country%>%
+  group_by(time = week(time)) %>% 
+  summarise(births = mean(births),
+            pop = mean(pop),
+            cases = sum(cases)) %>%
+  filter(time!=18)
+
+df_countryParms <- estpars(data=df_weekly,IP=1,
+                          alpha=0.97, sbar=NULL,
+                          regtype='loess',
+                          family='gaussian',link='identity')  
+## This was changed to gaussian to make this model Bayesian
+
+plotbreaks(data=df_weekly,threshold=3)
+
+df_countryRes <- simulatetsir(data=df_weekly,IP=1,
+                             parms=df_countryParms,
+                             epidemics='break',threshold=4,
+                             method='pois',nsim=100)
+
+plotcomp(df_countryRes)
+```
+
+
+
+## Shiny
+```{r}
+set.seed(458)
+
+# Build the user interface
+ui1 <- fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      h4("Specify the limit of the x-axis:"), 
+      sliderInput("Timeframe", "", min = 4, max = 16, value = c(4,16)),
+      h4("Specify the country:"), 
+      selectInput("country", "", list("China", "Italy", "Spain", "US"))
+    ),
+    
+    mainPanel(
+      h4("Plot of the simulation:"), 
+      plotOutput("simulation"),
+      h4("Table of the simulation:"), 
+      plotOutput("table")
+    )
+  )
+)
+
+server1 <- function(input, output) {
+  
+  df_country <- covid %>% 
+    filter(country == "US") %>% #when I change this to input$Country, I get error.  
+    select(pop, time, births, cases)
+  
+  df_weekly <- df_country %>%
+    group_by(time = week(time)) %>% 
+    summarise(births = mean(births),
+            pop = mean(pop),
+            cases = sum(cases)) %>%
+    filter(time!=18)
+  
+  df_countryParms <- estpars(data=df_weekly,IP=1,
+                          alpha=0.97, sbar=NULL,
+                          regtype='loess',
+                          family='gaussian',link='identity')  
+  
+  df_countryRes <- simulatetsir(data=df_weekly,IP=1,
+                             parms=df_countryParms,
+                             epidemics='break',threshold=4,
+                             method='pois',nsim=100)
+  
+  output$simulation <- renderPlot(
+    plotcomp(sim = df_countryRes))
+  
+  #We might need to do renderTable (look at HW3) here.
+}
+```
+
+
+````{r}
+# Run the shiny app!
+shinyApp(ui = ui1, server = server1)
+```
+

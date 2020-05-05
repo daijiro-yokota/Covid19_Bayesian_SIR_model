@@ -1,0 +1,62 @@
+---
+title: "bayes_capstone_4_20"
+author: "Daijiro Yokota"
+date: "4/20/2020"
+output: html_document
+---
+
+```{r warning=FALSE, message=FALSE}
+library(devtools)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(purrr)
+library(dplyr)
+library(stringr)
+library(forcats)
+```
+
+```{r message=FALSE}
+install_github("joachim-gassen/tidycovid19")
+
+library(tidycovid19)
+covid19_dta <- download_merged_data(silent = TRUE, cached = TRUE)
+```
+
+```{r message=FALSE}
+library(rclipboard)
+library(shiny)
+```
+
+```{r}
+merged <- download_merged_data(cached = TRUE)
+
+plot_covid19_spread(
+  merged, highlight = c("ITA", "ESP", "FRA", "DEU", "USA"),
+  intervention = "lockdown", edate_cutoff = 40
+)
+```
+
+```{r}
+names(covid19_dta)
+data_small <- covid19_dta %>%
+  select(country, iso3c, date, confirmed, deaths, recovered, region, income, population, land_area_skm, pop_density, pop_largest_city, life_expectancy, gdp_capita, lockdown)
+
+BirthRate <- readxl::read_xlsx("Birth rate.xlsx")
+
+BirthRate <- BirthRate %>%
+  pivot_longer(cols = -country,
+               names_to = "year",
+               values_to="BirthRate") %>%
+  mutate(year = as.numeric(year))
+
+#we have to change the name of countries
+BirthRate
+
+data <- data_small %>%
+  inner_join(BirthRate, by = c("country"))
+
+save(data,file="covid.Rda")
+```
+
+

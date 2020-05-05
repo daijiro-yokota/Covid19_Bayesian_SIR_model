@@ -1,0 +1,174 @@
+---
+title: "COVID-19 Final Capstone"
+author: "Ciara Moore, Daijiro Yokota, Christina Cai"
+date: "4/20/2020"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r, warning=FALSE, message=FALSE}
+## tsiR examples
+
+## load the package and dependencies
+## kernlab is for the gaussian process 
+## the rest are for plotting 
+require(tsiR)
+require(kernlab)
+require(ggplot2)
+require(reshape2)
+require(grid)
+require(dplyr)
+require(xts)
+library(lubridate)
+
+```
+
+
+```{r}
+
+theme_set(theme_gray(base_size = 22))
+## twentymeas is the included data set and is a list
+## pull out cities by name 
+names(twentymeas)
+```
+
+
+
+```{r, eval=FALSE}
+
+## London example
+
+LondonMeas <- twentymeas[["London"]]
+head(LondonMeas)
+plotdata(LondonMeas)
+```
+
+
+
+```{r, eval=FALSE}
+
+## run the tsir model
+## i.e. estimate parameters and then resimulate the model based on the fitted data
+## arguments and their descriptions can be found via ?runtsir
+LondonRes <- runtsir(data=LondonMeas,IP=2,
+                     xreg='cumcases',regtype='gaussian',
+                     alpha=NULL, sbar=NULL,
+                     method='negbin',nsim=100,
+                     family='gaussian',link='identity')
+```
+
+
+```{r, eval=FALSE}
+
+## plot the diagnostics, estimates, and forward simulations
+## first two plots are the cum.cases cum.births regression and under-reporting
+## next is the residuals Z, inferred Sbar, and thus resconstructed S
+## next is the seasonality beta (with CI) and alpha estimates 
+## the last two plots are forward simulations 
+## the top forward simulation is 10 randomly chosen simulations
+## the bottom is the mean (with CI)
+plotres(LondonRes)
+```
+
+```{r, eval=FALSE}
+
+## we can also call most of the individual subplots from plotres as below
+## this is useful for examining trends and confidence intervals closer
+
+## plot the cumbirths-cumcases regression
+plotregression(LondonRes)
+
+## plot the inferred reporting rate
+plotrho(LondonRes)
+
+## plot the inferred sbar
+plotsbar(LondonRes)
+
+## plot the inferred beta
+plotbeta(LondonRes)
+
+## plot the forward simulate with CI with prediction both inverted and not
+plotforward(LondonRes,inverse = F)
+plotforward(LondonRes,inverse = T)
+
+```
+
+
+```{r}
+
+## Northwich example
+NorthwichMeas <- twentymeas[["Northwich"]]
+
+plotdata(NorthwichMeas)
+
+NorthwichParms <- estpars(data=NorthwichMeas,IP=2,
+                          alpha=0.97, sbar=NULL,
+                          regtype='loess',
+                          family='gaussian',link='identity')  ## This was changed to gaussian to make this model Bayesian
+
+plotbreaks(data=NorthwichMeas,threshold=3)
+
+NorthwichRes <- simulatetsir(data=NorthwichMeas,IP=2,
+                             parms=NorthwichParms,
+                             epidemics='break',threshold=3,
+                             method='pois',nsim=100)
+
+
+## the last two plots are forward simulations 
+## the top forward simulation is 10 randomly chosen simulations
+## the bottom is the mean (with CI)
+plotcomp(NorthwichRes)
+
+```
+
+
+
+# our data
+```{r}
+load("covid.Rda")
+covid <- data
+
+covid$pop <- covid$population
+covid$time <- covid$date
+covid$cases <- covid$confirmed
+covid$births <- covid$BirthRate * 60421.760      ## change this to the population/1000 for each country
+df_country <- covid %>% filter(country == "Italy") %>% select(pop, time, births, cases)
+
+
+
+df_weekly <- df_country%>%
+  group_by(time = week(time)) %>% 
+  summarise(births = mean(births),
+            pop = mean(pop),
+            cases = sum(cases)) %>%
+  filter(time!=17)
+
+tsiRdata(df_weekly$time, df_weekly$cases, df_weekly$births, df_weekly$pop, IP=1)
+
+plotdata(df_weekly)
+```
+
+
+```{r} 
+df_countryParms <- estpars(data=df_weekly,IP=1,
+                          alpha=0.97, sbar=NULL,
+                          regtype='loess',
+                          family='gaussian',link='identity')  ## This was changed to gaussian to make this model Bayesian
+
+plotbreaks(data=df_weekly,threshold=3)
+
+df_countryRes <- simulatetsir(data=df_weekly,IP=1,
+                             parms=df_countryParms,
+                             epidemics='break',threshold=4,
+                             method='pois',nsim=100)
+
+
+## the last two plots are forward simulations 
+## the top forward simulation is 10 randomly chosen simulations
+## the bottom is the mean (with CI)
+plotcomp(df_countryRes)
+
+```
+

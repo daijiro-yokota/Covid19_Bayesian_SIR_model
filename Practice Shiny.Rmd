@@ -1,0 +1,79 @@
+---
+title: "t-SIR Modeling of COVID-19"
+author: "Christina Cai, Ciara Moore, Daijiro Yokota"
+date: "Last updated: 4/30/2020"
+output: html_document
+runtime: shiny
+---
+
+
+```{r, echo=FALSE}
+library(shiny)
+require(tsiR)
+require(kernlab)
+require(ggplot2)
+require(reshape2)
+require(grid)
+require(dplyr)
+require(xts)
+library(lubridate)
+library(shiny)
+
+# Define UI for app that has tabs at the top ----
+ui <- navbarPage("We can use shiny (kinda!)",
+  tabPanel("What is a t-SIR model?",
+           "Eventually there will be stuff here"),
+  tabPanel("COVID Dataset",
+           "and here"
+           # install_github("joachim-gassen/tidycovid19"),
+           # library(tidycovid19),
+           # covid19_dta <- download_merged_data(silent = TRUE, cached = TRUE),
+           # df <- covid19_dta %>%
+           # select(country, iso3c, date, confirmed, deaths, recovered, region, income, population, land_area_skm, pop_density, .data, pop_largest_city, life_expectancy, gdp_capita, lockdown, timestamp),
+           # dim(df),
+           # names(df),
+           # head(df),
+           # summary(df)
+  ),
+  tabPanel("View a Model by Country",
+           "and here"),
+  tabPanel("Citations",
+           "here's one sad citation all by itself right now and I can't figure out how to put text on different lines lol",
+           "Wickham Hadley. ggplot2: Elegant Graphics for Data Analysis; 2009.
+Wickham H. Reshaping Data with the reshape Package; 2007. Available from: https://cran.r-project.org/web/packages/reshape2/
+"),
+  tabPanel("Code for This App",
+           "blahhblahh")
+
+
+
+)
+
+
+# Define server logic to summarize and view selected dataset ----
+server <- function(input, output) {
+
+  # Return the requested dataset ----
+  datasetInput <- reactive({
+    switch(input$dataset,
+           "rock" = rock,
+           "pressure" = pressure,
+           "cars" = cars)
+  })
+
+  # Generate a summary of the dataset ----
+  output$summary <- renderPrint({
+    dataset <- datasetInput()
+    summary(dataset)
+  })
+
+  # Show the first "n" observations ----
+  output$view <- renderTable({
+    head(datasetInput(), n = input$obs)
+  })
+
+}
+
+# Create Shiny app ----
+shinyApp(ui = ui, server = server)
+```
